@@ -15,29 +15,28 @@
 #include "libim/im_color.h"
 
 // Global variables
-#define ROTATE 1
-#define TRANSLATE 2
-#define MAX_RAIN 100
+#define MAX_RAIN 50
 #define MAX_HOGS 12
-#define HAIL_WIDTH 0.5
-#define HAIL_HEIGHT 0.5
-const float hailSpawnRate = 0.5;
+#define DROP_WIDTH 0.5
+#define DROP_HEIGHT 0.5
+#define DROP_DEPTH 0.5
+const float dropSpawnRate = 0.3; // lower means more frequent
 const float spawnHeight = 1.9;
 float Vy = 0.03;
-float lastHailTime = 0.0;
-int currentHail = 0;
+float lastDropTime = 0.0;
+int currentDrop = 0;
 unsigned char *background_texture;
 int bg_xdim, bg_ydim;
 
-struct Hail
+struct RainDrop
 {
    float x, y, z, Ax, Ay, Az;
-   int img, xdim,ydim;
+   int img, xdim, ydim;
    bool draw;
    unsigned char *texture;
 };
 
-Hail rain[MAX_RAIN];
+RainDrop rain[MAX_RAIN];
 
 //---------------------------------------
 // Initialize texture image
@@ -76,11 +75,17 @@ void init_texture(char *name, unsigned char *&texture, int &xdim, int &ydim)
 //---------------------------------------
 // Function to draw 3D block
 //---------------------------------------
-void block(Hail rainDrop, float xmin, float ymin, float zmin,
-   float xmax, float ymax, float zmax)
+void block(RainDrop rainDrop)
 {
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, rainDrop.xdim, rainDrop.ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, rainDrop.texture);
    // Front face
+   float xmin = rainDrop.x;
+   float ymin = rainDrop.y;
+   float zmin = rainDrop.z;
+   float xmax = rainDrop.x + DROP_WIDTH;
+   float ymax = rainDrop.y + DROP_HEIGHT;
+   float zmax = rainDrop.z + DROP_DEPTH;
+
    glBegin(GL_POLYGON);
    glTexCoord2f(0.0, 1.0);
    glVertex3f(xmin, ymin, zmax);
@@ -180,6 +185,16 @@ void draw_background()
    glEnable(GL_DEPTH_TEST);
 }
 
+//--------------------------------------
+// Time function to figure out how long
+// the program has been running
+// returns it in seconds
+//--------------------------------------
+float getTime()
+{
+   return glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
+}
+
 //---------------------------------------
 // Init function for OpenGL
 //---------------------------------------
@@ -196,9 +211,9 @@ void init()
 
    for (int i = 0; i < MAX_RAIN; i++)
    {
-      rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f); // -2 to +2
-      rain[i].y = spawnHeight; // -2 to +2
-      rain[i].z = 0.1; // -2 to +2
+      rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f);
+      rain[i].y = spawnHeight;
+      rain[i].z = 0.1;
       rain[i].img = rand() % MAX_HOGS;
       rain[i].draw = false;
    }
@@ -213,9 +228,9 @@ void init()
 
    for (int i = 0; i < MAX_RAIN; i++)
    {
-      char filename[64];
-      sprintf(filename, "textures/hog%d.jpg", rain[i].img + 1);
-      init_texture((char *)filename, rain[i].texture, rain[i].xdim, rain[i].ydim);
+      // https://cplusplus.com/reference/string/string/c_str/
+      string filename = "textures/hog" + to_string(rain[i].img + 1) + ".jpg";
+      init_texture((char *)filename.c_str(), rain[i].texture, rain[i].xdim, rain[i].ydim);
    }
 
    init_texture((char *)"textures/cloud2.jpg", background_texture, bg_xdim, bg_ydim);
@@ -240,18 +255,15 @@ void display()
 
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-   // glTranslatef(xpos / 500.0, ypos / 500.0, zpos / 500.0);
-   // glRotatef(xangle, 1.0, 0.0, 0.0);
-   // glRotatef(yangle, 0.0, 1.0, 0.0);
-   // glRotatef(zangle, 0.0, 0.0, 1.0);
-   // spin the blocks weeeeeeeeee
+
+   // spin and draw the drop weeeeeeeeee
    for (int i = 0; i < MAX_RAIN; i++) {
       if (rain[i].draw) {
          glPushMatrix();
    
-         float centerX = rain[i].x + HAIL_WIDTH / 2.0f;
-         float centerY = rain[i].y + HAIL_HEIGHT / 2.0f;
-         float centerZ = rain[i].z + 0.25f;
+         float centerX = rain[i].x + DROP_WIDTH / 2.0f;
+         float centerY = rain[i].y + DROP_HEIGHT / 2.0f;
+         float centerZ = rain[i].z + DROP_DEPTH;
    
          glTranslatef(centerX, centerY, centerZ);
          glRotatef(rain[i].Ax, 1.0f, 0.0f, 0.0f);
@@ -260,62 +272,52 @@ void display()
    
          glTranslatef(-centerX, -centerY, -centerZ);
    
-         block(rain[i], rain[i].x, rain[i].y, rain[i].z, rain[i].x + HAIL_WIDTH,  rain[i].y + HAIL_HEIGHT, rain[i].z + 0.5f); // depth = 0.5
-   
+         block(rain[i]);
          glPopMatrix();
       }
    }   
    glFlush();
 }
 
-float getTime()
-{
-   return glutGet(GLUT_ELAPSED_TIME) / 1000.0f; // returns time since program started in seconds
-}
-
 void idle()
 {
    float currentTime = getTime();
 
-   if ((currentTime - lastHailTime) > hailSpawnRate)
+   if ((currentTime - lastDropTime) > dropSpawnRate)
    {
-      // spawn currenthail
-      lastHailTime = currentTime;
-      rain[currentHail].draw = true;
-      currentHail++;
+      // spawn currentDrop
+      lastDropTime = currentTime;
+      rain[currentDrop].draw = true;
+      // move to next RainDrop
+      currentDrop++;
    }
    for (int i = 0; i < MAX_RAIN; i++){
       if ((rain[i].draw) && (rain[i].y > -2.1)) {
          // keep falling and spinning
          rain[i].y -= Vy;
-         rain[i].Ax += 1;
-         rain[i].Ay += 1;
-         rain[i].Az += 1;
+         rain[i].Ax += 1.5;
+         rain[i].Ay += 1.5;
+         rain[i].Az += 1.5;
       } else {
-          // stop falling
-          rain[i].draw = false;
-      }
-   }
-   if (currentHail > MAX_RAIN){
-      currentHail = 0;
-      for (int i = 0; i < MAX_RAIN; i++){
+         // stop falling and randomize start points again
+         rain[i].draw = false;
          rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f); // -2 to +2
          rain[i].y = spawnHeight; // -2 to +2
          rain[i].z = 0.1; // -2 to +2
          rain[i].img = rand() % MAX_HOGS;
-         rain[i].draw = false;
       }
+   }
+   if (currentDrop >= MAX_RAIN) {
+      currentDrop = 0;
    }
    glutPostRedisplay();
 }
 
-//
 //---------------------------------------
 // Main program
 //---------------------------------------
 int main(int argc, char *argv[])
 {
-   // thankyoutoo@cox.net
    //  Create OpenGL window
    glutInit(&argc, argv);
    glutInitWindowSize(500, 500);
