@@ -1,9 +1,8 @@
 //---------------------------------------
-// Program: texture4.cpp
-// Purpose: Texture map earth from space
-//          photograph onto a cube model.
-// Author:  John Gauch
-// Date:    April 2011
+// Program: main.cpp
+// Purpose: Assignment 5 Computer Graphics Spring 2025
+// Author:  Lizzie Howell
+// Date:    April 2025
 //---------------------------------------
 #include <math.h>
 #include <stdio.h>
@@ -20,29 +19,20 @@
 #define TRANSLATE 2
 #define MAX_RAIN 100
 #define MAX_HOGS 12
+#define HAIL_WIDTH 0.5
+#define HAIL_HEIGHT 0.5
 const float hailSpawnRate = 0.5;
 const float spawnHeight = 1.9;
-int xangle = 0;
-int yangle = 0;
-int zangle = 0;
-int xpos = 0;
-int ypos = 0;
-int zpos = 0;
-float Vy = 0.05;
-float randomX = 0;
-int mode = ROTATE;
+float Vy = 0.03;
 float lastHailTime = 0.0;
 int currentHail = 0;
-bool drawNewBlock = false;
 unsigned char *background_texture;
 int bg_xdim, bg_ydim;
 
-int xdim, ydim;
-
 struct Hail
 {
-   float x, y, z;
-   int img;
+   float x, y, z, Ax, Ay, Az;
+   int img, xdim,ydim;
    bool draw;
    unsigned char *texture;
 };
@@ -86,9 +76,10 @@ void init_texture(char *name, unsigned char *&texture, int &xdim, int &ydim)
 //---------------------------------------
 // Function to draw 3D block
 //---------------------------------------
-void block(float xmin, float ymin, float zmin,
+void block(Hail rainDrop, float xmin, float ymin, float zmin,
    float xmax, float ymax, float zmax)
 {
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, rainDrop.xdim, rainDrop.ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, rainDrop.texture);
    // Front face
    glBegin(GL_POLYGON);
    glTexCoord2f(0.0, 1.0);
@@ -205,29 +196,26 @@ void init()
 
    for (int i = 0; i < MAX_RAIN; i++)
    {
-      rain[i].x = -2.0f + static_cast<float>(rand()) / (RAND_MAX / 4.0f); // -2 to +2
+      rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f); // -2 to +2
       rain[i].y = spawnHeight; // -2 to +2
       rain[i].z = 0.1; // -2 to +2
       rain[i].img = rand() % MAX_HOGS;
       rain[i].draw = false;
-      printf("create rain drop: %f, %f, %f, %d", rain[i].x, rain[i].y, rain[i].z, rain[i].img);
    }
 
    // Init texture
+   glEnable(GL_TEXTURE_2D);
+   glTexParameterf(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+
    for (int i = 0; i < MAX_RAIN; i++)
    {
       char filename[64];
       sprintf(filename, "textures/hog%d.jpg", rain[i].img + 1);
-
-      init_texture((char *)filename, rain[i].texture, xdim, ydim);
-      glEnable(GL_TEXTURE_2D);
-      glTexParameterf(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xdim, ydim,
-                   0, GL_RGB, GL_UNSIGNED_BYTE, rain[i].texture);
+      init_texture((char *)filename, rain[i].texture, rain[i].xdim, rain[i].ydim);
    }
 
    init_texture((char *)"textures/cloud2.jpg", background_texture, bg_xdim, bg_ydim);
@@ -252,23 +240,31 @@ void display()
 
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-   glTranslatef(xpos / 500.0, ypos / 500.0, zpos / 500.0);
-   glRotatef(xangle, 1.0, 0.0, 0.0);
-   glRotatef(yangle, 0.0, 1.0, 0.0);
-   glRotatef(zangle, 0.0, 0.0, 1.0);
-
-   // Draw objects
-   // block(randomX, -0.25, -0.25, randomX + 0.5, 0.25, 0.25);
-
-   // if (drawNewBlock) {   
-   //    block(rain[currentHail].x, rain[currentHail].y, rain[currentHail].z, rain[currentHail].x + 0.25, rain[currentHail].y + 0.25, rain[currentHail].z +0.2);
-   // } 
-   for (int i = 0; i < MAX_RAIN; i++){
+   // glTranslatef(xpos / 500.0, ypos / 500.0, zpos / 500.0);
+   // glRotatef(xangle, 1.0, 0.0, 0.0);
+   // glRotatef(yangle, 0.0, 1.0, 0.0);
+   // glRotatef(zangle, 0.0, 0.0, 1.0);
+   // spin the blocks weeeeeeeeee
+   for (int i = 0; i < MAX_RAIN; i++) {
       if (rain[i].draw) {
-         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xdim, ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, rain[i].texture);
-         block(rain[i].x, rain[i].y, rain[i].z, rain[i].x + 0.5, rain[i].y + 0.5, rain[i].z+0.5);
+         glPushMatrix();
+   
+         float centerX = rain[i].x + HAIL_WIDTH / 2.0f;
+         float centerY = rain[i].y + HAIL_HEIGHT / 2.0f;
+         float centerZ = rain[i].z + 0.25f;
+   
+         glTranslatef(centerX, centerY, centerZ);
+         glRotatef(rain[i].Ax, 1.0f, 0.0f, 0.0f);
+         glRotatef(rain[i].Ay, 0.0f, 1.0f, 0.0f);
+         glRotatef(rain[i].Az, 0.0f, 0.0f, 1.0f);
+   
+         glTranslatef(-centerX, -centerY, -centerZ);
+   
+         block(rain[i], rain[i].x, rain[i].y, rain[i].z, rain[i].x + HAIL_WIDTH,  rain[i].y + HAIL_HEIGHT, rain[i].z + 0.5f); // depth = 0.5
+   
+         glPopMatrix();
       }
-   }  
+   }   
    glFlush();
 }
 
@@ -280,27 +276,21 @@ float getTime()
 void idle()
 {
    float currentTime = getTime();
-   // float calculation = currentTime - lastHailTime;
-   // printf("%f\n", calculation);
-   // printf("%f\n", hailSpawnRate)
 
    if ((currentTime - lastHailTime) > hailSpawnRate)
    {
       // spawn currenthail
-      printf("spawning hail num %d\n", currentHail);
       lastHailTime = currentTime;
-      // randomX = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX/2));
-      // randomX = -2.0 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / (1.5 - (-2.0)));
-      // printf("%f\n", randomX);
-      //    block(randomX, -0.25, -0.25, randomX + 0.5, 0.25, 0.25);
       rain[currentHail].draw = true;
       currentHail++;
    }
    for (int i = 0; i < MAX_RAIN; i++){
       if ((rain[i].draw) && (rain[i].y > -2.1)) {
-         // keep falling
+         // keep falling and spinning
          rain[i].y -= Vy;
-         printf(" rain%d: %f", i, rain[i].y);
+         rain[i].Ax += 1;
+         rain[i].Ay += 1;
+         rain[i].Az += 1;
       } else {
           // stop falling
           rain[i].draw = false;
@@ -314,11 +304,8 @@ void idle()
          rain[i].z = 0.1; // -2 to +2
          rain[i].img = rand() % MAX_HOGS;
          rain[i].draw = false;
-         printf("create rain drop: %f, %f, %f, %d", rain[i].x, rain[i].y, rain[i].z, rain[i].img);
       }
    }
-   // printf("currentHail%d",currentHail);
-   // currentHail++;
    glutPostRedisplay();
 }
 
