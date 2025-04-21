@@ -22,7 +22,7 @@
 #define DROP_DEPTH 0.5
 const float dropSpawnRate = 0.3; // lower means more frequent
 const float spawnHeight = 1.9;
-float Vy = 0.03;
+// float Vy = 0.03;
 float lastDropTime = 0.0;
 int currentDrop = 0;
 unsigned char *background_texture;
@@ -30,7 +30,7 @@ int bg_xdim, bg_ydim;
 
 struct RainDrop
 {
-   float x, y, z, Ax, Ay, Az;
+   float x, y, z, Ax, Ay, Az, Vy;
    int img, xdim, ydim;
    bool draw;
    unsigned char *texture;
@@ -214,6 +214,10 @@ void init()
       rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f);
       rain[i].y = spawnHeight;
       rain[i].z = 0.1;
+      rain[i].Ax = rand() / RAND_MAX;
+      rain[i].Ay = rand() / RAND_MAX;
+      rain[i].Az = rand() / RAND_MAX;
+      rain[i].Vy = 0.01f + static_cast<float>(rand()) / RAND_MAX * (0.05f - 0.01f);
       rain[i].img = rand() % MAX_HOGS;
       rain[i].draw = false;
    }
@@ -228,7 +232,6 @@ void init()
 
    for (int i = 0; i < MAX_RAIN; i++)
    {
-      // https://cplusplus.com/reference/string/string/c_str/
       string filename = "textures/hog" + to_string(rain[i].img + 1) + ".jpg";
       init_texture((char *)filename.c_str(), rain[i].texture, rain[i].xdim, rain[i].ydim);
    }
@@ -257,25 +260,27 @@ void display()
    glLoadIdentity();
 
    // spin and draw the drop weeeeeeeeee
-   for (int i = 0; i < MAX_RAIN; i++) {
-      if (rain[i].draw) {
+   for (int i = 0; i < MAX_RAIN; i++)
+   {
+      if (rain[i].draw)
+      {
          glPushMatrix();
-   
+
          float centerX = rain[i].x + DROP_WIDTH / 2.0f;
          float centerY = rain[i].y + DROP_HEIGHT / 2.0f;
          float centerZ = rain[i].z + DROP_DEPTH;
-   
+
          glTranslatef(centerX, centerY, centerZ);
          glRotatef(rain[i].Ax, 1.0f, 0.0f, 0.0f);
          glRotatef(rain[i].Ay, 0.0f, 1.0f, 0.0f);
          glRotatef(rain[i].Az, 0.0f, 0.0f, 1.0f);
-   
+
          glTranslatef(-centerX, -centerY, -centerZ);
-   
+
          block(rain[i]);
          glPopMatrix();
       }
-   }   
+   }
    glFlush();
 }
 
@@ -291,23 +296,28 @@ void idle()
       // move to next RainDrop
       currentDrop++;
    }
-   for (int i = 0; i < MAX_RAIN; i++){
-      if ((rain[i].draw) && (rain[i].y > -2.1)) {
+   for (int i = 0; i < MAX_RAIN; i++)
+   {
+      if ((rain[i].draw) && (rain[i].y > -2.1))
+      {
          // keep falling and spinning
-         rain[i].y -= Vy;
+         rain[i].y -= rain[i].Vy;
          rain[i].Ax += 1.5;
          rain[i].Ay += 1.5;
          rain[i].Az += 1.5;
-      } else {
+      }
+      else
+      {
          // stop falling and randomize start points again
          rain[i].draw = false;
          rain[i].x = -1.5f + static_cast<float>(rand()) / (RAND_MAX / 3.0f); // -2 to +2
-         rain[i].y = spawnHeight; // -2 to +2
-         rain[i].z = 0.1; // -2 to +2
+         rain[i].y = spawnHeight;                                            // -2 to +2
+         rain[i].z = 0.1;                                                    // -2 to +2
          rain[i].img = rand() % MAX_HOGS;
       }
    }
-   if (currentDrop >= MAX_RAIN) {
+   if (currentDrop >= MAX_RAIN)
+   {
       currentDrop = 0;
    }
    glutPostRedisplay();
